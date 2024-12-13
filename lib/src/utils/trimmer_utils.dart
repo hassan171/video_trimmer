@@ -25,9 +25,7 @@ String _formatDuration(Duration duration) {
 int _mapQualityToFFmpegScale(int quality) {
   if (quality < 1) return 1; // Best quality
   if (quality > 100) return 31; // Worst quality
-  return ((101 - quality) / 3.25)
-      .toInt()
-      .clamp(1, 31); // Scale 1 (best) to 31 (worst)
+  return ((101 - quality) / 3.25).toInt().clamp(1, 31); // Scale 1 (best) to 31 (worst)
 }
 
 /// Generates a stream of thumbnails for a given video.
@@ -98,8 +96,7 @@ Stream<List<Uint8List?>> generateThumbnail({
 
       // Calculate the timestamp for the thumbnail in milliseconds
       final timestamp = (eachPart * i).toInt();
-      final formattedTimestamp =
-          _formatDuration(Duration(milliseconds: timestamp));
+      final formattedTimestamp = _formatDuration(Duration(milliseconds: timestamp));
       final thumbnailPath = "${tmpDir.path}/thumbnail_$i.jpg";
 
       // Delete the file if it already exists

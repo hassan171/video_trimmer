@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:transparent_image/transparent_image.dart';
 import 'package:video_trimmer/src/utils/trimmer_utils.dart';
 
-/// For showing the thumbnails generated from the video in a scrollable view,
-/// like a frame by frame preview.
-class ScrollableThumbnailViewer extends StatelessWidget {
+/// A widget for showing the thumbnails generated from the video
+/// in a horizontally scrollable view, like a frame-by-frame preview.
+class ScrollableThumbnailViewer extends StatefulWidget {
   /// Creates a [ScrollableThumbnailViewer] widget.
   ///
   /// - [videoFile] is the video file from which thumbnails are generated.
@@ -51,70 +51,111 @@ class ScrollableThumbnailViewer extends StatelessWidget {
   /// Callback function that is called when thumbnail loading is complete.
   final VoidCallback onThumbnailLoadingComplete;
 
-  /// The quality of the generated thumbnails, ranging from 0 to 100.
-  /// Defaults to 75.
+  /// The quality of the generated thumbnails, ranging from 0 to 100. Defaults to 75.
   final int quality;
+
+  @override
+  State<ScrollableThumbnailViewer> createState() => _ScrollableThumbnailViewerState();
+}
+
+class _ScrollableThumbnailViewerState extends State<ScrollableThumbnailViewer> {
+  /// Cache to store generated thumbnails and avoid redundant regeneration.
+  late List<Uint8List?> _thumbnailCache;
+
+  /// Stream of thumbnail data for generating thumbnails dynamically.
+  late Stream<List<Uint8List?>> _thumbnailStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeThumbnails();
+  }
+
+  /// Initializes the thumbnail cache and starts the thumbnail generation stream.
+  void _initializeThumbnails() {
+    // Initialize the cache with placeholders (null).
+    _thumbnailCache = List<Uint8List?>.filled(widget.numberOfThumbnails, null);
+
+    // Start generating thumbnails via the stream.
+    _thumbnailStream = generateThumbnail(
+      videoPath: widget.videoFile.path,
+      videoDuration: widget.videoDuration,
+      numberOfThumbnails: widget.numberOfThumbnails,
+      quality: widget.quality,
+      onThumbnailLoadingComplete: widget.onThumbnailLoadingComplete,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        controller: scrollController,
+        controller: widget.scrollController,
         child: SizedBox(
-          width: numberOfThumbnails * thumbnailHeight,
-          height: thumbnailHeight,
+          width: widget.numberOfThumbnails * widget.thumbnailHeight,
+          height: widget.thumbnailHeight,
           child: StreamBuilder<List<Uint8List?>>(
-            stream: generateThumbnail(
-              videoPath: videoFile.path,
-              videoDuration: videoDuration,
-              numberOfThumbnails: numberOfThumbnails,
-              quality: quality,
-              onThumbnailLoadingComplete: onThumbnailLoadingComplete,
-            ),
+            stream: _thumbnailStream,
             builder: (context, snapshot) {
               if (snapshot.hasData) {
-                List<Uint8List?> imageBytes = snapshot.data!;
-                return Row(
-                  mainAxisSize: MainAxisSize.max,
-                  children: List.generate(
-                    numberOfThumbnails,
-                    (index) => SizedBox(
-                      height: thumbnailHeight,
-                      width: thumbnailHeight,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Opacity(
-                            opacity: 0.2,
-                            child: Image.memory(
-                              imageBytes[0] ?? kTransparentImage,
-                              fit: fit,
-                            ),
+                // Update the cache with new thumbnails from the stream.
+                List<Uint8List?> newThumbnails = snapshot.data!;
+                for (int i = 0; i < newThumbnails.length; i++) {
+                  if (newThumbnails[i] != null) {
+                    _thumbnailCache[i] = newThumbnails[i];
+                  }
+                }
+              }
+
+              // Build the row of thumbnails using the cache.
+              return Row(
+                mainAxisSize: MainAxisSize.max,
+                children: List.generate(
+                  widget.numberOfThumbnails,
+                  (index) => SizedBox(
+                    height: widget.thumbnailHeight,
+                    width: widget.thumbnailHeight,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Display a placeholder with reduced opacity as a fallback.
+                        Opacity(
+                          opacity: 0.2,
+                          child: Image.memory(
+                            _thumbnailCache[0] ?? kTransparentImage,
+                            fit: widget.fit,
                           ),
-                          index < imageBytes.length && imageBytes[index] != null
-                              ? FadeInImage(
-                                  placeholder: MemoryImage(kTransparentImage),
-                                  image: MemoryImage(imageBytes[index]!),
-                                  fit: fit,
-                                )
-                              : const SizedBox(),
-                        ],
-                      ),
+                        ),
+                        // Display the actual thumbnail if available in the cache.
+                        _thumbnailCache[index] != null
+                            ? FadeInImage(
+                                placeholder: MemoryImage(kTransparentImage),
+                                image: MemoryImage(_thumbnailCache[index]!),
+                                fit: widget.fit,
+                              )
+                            : const SizedBox(),
+                      ],
                     ),
                   ),
-                );
-              } else {
-                return Container(
-                  color: Colors.grey[900],
-                  height: thumbnailHeight,
-                  width: double.maxFinite,
-                );
-              }
+                ),
+              );
             },
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant ScrollableThumbnailViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Regenerate thumbnails only if key parameters change.
+    if (oldWidget.videoFile != widget.videoFile ||
+        oldWidget.videoDuration != widget.videoDuration ||
+        oldWidget.numberOfThumbnails != widget.numberOfThumbnails ||
+        oldWidget.quality != widget.quality) {
+      _initializeThumbnails();
+    }
   }
 }
