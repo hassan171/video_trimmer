@@ -217,6 +217,7 @@ class Trimmer {
 
     // Construct FFmpeg command
     final StringBuffer commandBuffer = StringBuffer()
+      ..write('-loglevel debug ')
       ..write('-ss $formattedStart ')
       ..write('-i "$videoPath" ')
       ..write('-t $formattedEnd ')
