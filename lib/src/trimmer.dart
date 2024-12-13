@@ -159,7 +159,8 @@ class Trimmer {
   Future<void> saveTrimmedVideo({
     required double startValue,
     required double endValue,
-    required Function(String? outputPath) onSave,
+    required Function(String outputPath) onSave,
+    required Function(String errorMessage) onError,
     bool applyVideoEncoding = false,
     FileFormat? outputFormat,
     String? ffmpegCommand,
@@ -169,30 +170,63 @@ class Trimmer {
     String? videoFolderName,
     String? videoFileName,
     StorageDir? storageDir,
+    double? minDuration,
   }) async {
+    // Validate input parameters
+    if (currentVideoFile == null || !currentVideoFile!.existsSync()) {
+      debugPrint("ERROR: Current video file does not exist.");
+      onError("Video file does not exist or is invalid.");
+      return;
+    }
+
+    if (startValue >= endValue) {
+      debugPrint("ERROR: Invalid start and end values. Start must be less than end.");
+      onError("Start value cannot be greater than or equal to end value.");
+      return;
+    }
+
+    // Enforce minimum duration if specified
+    double duration = endValue - startValue;
+    if (minDuration != null && duration < minDuration) {
+      double adjustment = minDuration - duration;
+
+      if (endValue + adjustment <= currentVideoFile!.lengthSync()) {
+        debugPrint("WARNING: Adjusting end value to meet minimum duration.");
+        endValue += adjustment;
+      } else {
+        debugPrint("ERROR: Video segment is too short and cannot meet minimum duration.");
+        onError("Video segment duration is too short to meet the minimum duration.");
+        return;
+      }
+    }
+
+    // Set defaults
     outputFormat ??= FileFormat.mp4;
     fpsGIF ??= 10;
     scaleGIF ??= 480;
 
+    // Prepare file paths and names
     final String videoPath = currentVideoFile!.path;
-    final String videoName = basename(videoPath).split('.')[0];
-    final String dateTime = DateFormat.yMMMd().addPattern('-').add_Hms().format(DateTime.now()).toString().replaceAll(' ', '');
+    final String videoName = basenameWithoutExtension(videoPath);
+    final String dateTime = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     videoFolderName ??= "Trimmer";
-    videoFileName ??= "${videoName}_trimmed:$dateTime".replaceAll(' ', '_');
+    videoFileName ??= "${videoName}_trimmed_$dateTime".replaceAll(RegExp(r'[: ]'), '_');
 
-    String path = await _createFolderInAppDocDir(videoFolderName, storageDir);
-    debugPrint("Trimmer folder path: $path");
+    String outputDirectory = await _createFolderInAppDocDir(videoFolderName, storageDir);
+    debugPrint("Trimmer folder path: $outputDirectory");
 
-    Duration startPoint = Duration(milliseconds: startValue.toInt());
-    Duration endPoint = Duration(milliseconds: endValue.toInt());
-
-    String outputPath = '$path$videoFileName${outputFormat.toString()}';
+    String outputPath = '$outputDirectory/$videoFileName${outputFormat.toString()}';
     debugPrint('Output Path: $outputPath');
 
+    // Format timestamps
+    String formattedStart = _formatDuration(Duration(milliseconds: startValue.toInt()));
+    String formattedEnd = _formatDuration(Duration(milliseconds: endValue.toInt() - startValue.toInt()));
+
+    // Construct FFmpeg command
     final StringBuffer commandBuffer = StringBuffer()
-      ..write('-ss $startPoint ')
+      ..write('-ss $formattedStart ')
       ..write('-i "$videoPath" ')
-      ..write('-t ${endPoint - startPoint} ')
+      ..write('-t $formattedEnd ')
       ..write('-avoid_negative_ts make_zero ');
 
     if (ffmpegCommand == null) {
@@ -213,6 +247,7 @@ class Trimmer {
 
     debugPrint('FFmpeg Command: $command');
 
+    // Execute FFmpeg command
     FFmpegKit.executeAsync(command, (session) async {
       final state = await session.getState();
       final returnCode = await session.getReturnCode();
@@ -226,9 +261,19 @@ class Trimmer {
         onSave(outputPath);
       } else {
         debugPrint("FFmpeg processing failed with error: $failStackTrace");
-        onSave(null);
+        onError("FFmpeg processing failed: $failStackTrace");
       }
     });
+  }
+
+  /// Helper to format duration into FFmpeg-compatible timestamp
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    final milliseconds = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
+    return "$hours:$minutes:$seconds.$milliseconds";
   }
 
   /// For getting the video controller state, to know whether the

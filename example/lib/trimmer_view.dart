@@ -51,6 +51,12 @@ class _TrimmerViewState extends State<TrimmerView> {
           ),
         );
       },
+      onError: (message) {
+        setState(() {
+          _progressVisibility = false;
+        });
+        debugPrint('ERROR SAVING FILE: $message');
+      },
     );
   }
 
@@ -103,8 +109,7 @@ class _TrimmerViewState extends State<TrimmerView> {
                       ),
                       onChangeStart: (value) => _startValue = value,
                       onChangeEnd: (value) => _endValue = value,
-                      onChangePlaybackState: (value) =>
-                          setState(() => _isPlaying = value),
+                      onChangePlaybackState: (value) => setState(() => _isPlaying = value),
                     ),
                   ),
                 ),
