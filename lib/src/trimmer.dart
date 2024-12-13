@@ -188,16 +188,9 @@ class Trimmer {
     // Enforce minimum duration if specified
     double duration = endValue - startValue;
     if (minDuration != null && duration < minDuration) {
-      double adjustment = minDuration - duration;
-
-      if (endValue + adjustment <= currentVideoFile!.lengthSync()) {
-        debugPrint("WARNING: Adjusting end value to meet minimum duration.");
-        endValue += adjustment;
-      } else {
-        debugPrint("ERROR: Video segment is too short and cannot meet minimum duration.");
-        onError("Video segment duration is too short to meet the minimum duration.");
-        return;
-      }
+      debugPrint("ERROR: Video segment is too short and cannot meet minimum duration.");
+      onError("Video segment duration is too short to meet the minimum duration.");
+      return;
     }
 
     // Set defaults
@@ -252,6 +245,7 @@ class Trimmer {
       final state = await session.getState();
       final returnCode = await session.getReturnCode();
       final failStackTrace = await session.getFailStackTrace();
+      final logs = await session.getAllLogsAsString();
 
       debugPrint("FFmpeg process exited with state: ${FFmpegKitConfig.sessionStateToString(state)}");
       debugPrint("Return code: $returnCode");
@@ -261,6 +255,7 @@ class Trimmer {
         onSave(outputPath);
       } else {
         debugPrint("FFmpeg processing failed with error: $failStackTrace");
+        debugPrint("FFmpeg logs: $logs");
         onError("FFmpeg processing failed: $failStackTrace");
       }
     });
