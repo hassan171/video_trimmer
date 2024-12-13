@@ -159,7 +159,7 @@ class Trimmer {
   Future<void> saveTrimmedVideo({
     required double startValue,
     required double endValue,
-    required Function(String outputPath) onSave,
+    required Function(String? outputPath) onSave,
     required Function(String errorMessage) onError,
     bool applyVideoEncoding = false,
     FileFormat? outputFormat,
@@ -172,6 +172,11 @@ class Trimmer {
     StorageDir? storageDir,
     Duration? minDuration,
   }) async {
+    // Validate if the MP4 file is valid
+    if (currentVideoFile == null || !await isValidMP4File(currentVideoFile!.path)) {
+      onError("The video file is invalid or corrupted.");
+      return;
+    }
     // Validate input parameters
     if (currentVideoFile == null || !currentVideoFile!.existsSync()) {
       debugPrint("ERROR: Current video file does not exist.");
@@ -270,6 +275,14 @@ class Trimmer {
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     final milliseconds = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
     return "$hours:$minutes:$seconds.$milliseconds";
+  }
+
+  Future<bool> isValidMP4File(String filePath) async {
+    final result = await FFmpegKit.execute('-i "$filePath"');
+    final returnCode = await result.getReturnCode();
+
+    // Check if the file has a valid moov atom or not
+    return ReturnCode.isSuccess(returnCode);
   }
 
   /// For getting the video controller state, to know whether the
