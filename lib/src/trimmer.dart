@@ -171,11 +171,25 @@ class Trimmer {
     String? videoFileName,
     StorageDir? storageDir,
     Duration? minDuration,
+    bool fixInvalidFile = false,
   }) async {
     // Validate if the MP4 file is valid
     if (currentVideoFile == null || !await isValidMP4File(currentVideoFile!.path)) {
-      onError("The video file is invalid or corrupted.");
-      return;
+      if (fixInvalidFile) {
+        debugPrint("Invalid video file. Trying to fix it.");
+        final fixedFile = await _fixInvalidMP4File(currentVideoFile!);
+        if (fixedFile != null) {
+          currentVideoFile = fixedFile;
+        } else {
+          debugPrint("ERROR: Failed to fix the video file.");
+          onError("The video file is invalid or corrupted.");
+          return;
+        }
+      } else {
+        debugPrint("ERROR: The video file is invalid or corrupted.");
+        onError("The video file is invalid or corrupted.");
+        return;
+      }
     }
     // Validate input parameters
     if (currentVideoFile == null || !currentVideoFile!.existsSync()) {
@@ -283,6 +297,42 @@ class Trimmer {
 
     // Check if the file has a valid moov atom or not
     return ReturnCode.isSuccess(returnCode);
+  }
+
+  Future<File?> _fixInvalidMP4File(File file) async {
+    final String videoPath = file.path;
+    final String videoName = basenameWithoutExtension(videoPath);
+    final String dateTime = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final String fixedFileName = "${videoName}_fixed_$dateTime.mp4";
+
+    final String outputDirectory = await _createFolderInAppDocDir("Trimmer", StorageDir.applicationDocumentsDirectory);
+    final String outputPath = '$outputDirectory/$fixedFileName';
+
+    // Try to fix by moving the moov atom to the beginning
+    final result = await FFmpegKit.executeAsync(
+      '-i "$videoPath" -c copy -map 0 -movflags faststart "$outputPath"',
+    );
+
+    final returnCode = await result.getReturnCode();
+    if (ReturnCode.isSuccess(returnCode)) {
+      debugPrint("Successfully fixed the file.");
+      return File(outputPath);
+    } else {
+      // If fixing with copy didn't work, try re-encoding the file
+      debugPrint("Failed to fix with copy. Trying re-encoding...");
+      final reencodeResult = await FFmpegKit.executeAsync(
+        '-i "$videoPath" -c:v libx264 -c:a aac -strict experimental "$outputPath"',
+      );
+
+      final reencodeReturnCode = await reencodeResult.getReturnCode();
+      if (ReturnCode.isSuccess(reencodeReturnCode)) {
+        debugPrint("Re-encoding successful.");
+        return File(outputPath);
+      } else {
+        debugPrint("Re-encoding failed.");
+        return null;
+      }
+    }
   }
 
   /// For getting the video controller state, to know whether the
