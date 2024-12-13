@@ -159,7 +159,7 @@ class Trimmer {
   Future<void> saveTrimmedVideo({
     required double startValue,
     required double endValue,
-    required Function(String? outputPath) onSave,
+    required Function(String outputPath) onSave,
     required Function(String errorMessage) onError,
     bool applyVideoEncoding = false,
     FileFormat? outputFormat,
