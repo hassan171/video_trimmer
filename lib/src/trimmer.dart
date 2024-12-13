@@ -170,7 +170,7 @@ class Trimmer {
     String? videoFolderName,
     String? videoFileName,
     StorageDir? storageDir,
-    double? minDuration,
+    Duration? minDuration,
   }) async {
     // Validate input parameters
     if (currentVideoFile == null || !currentVideoFile!.existsSync()) {
@@ -187,7 +187,7 @@ class Trimmer {
 
     // Enforce minimum duration if specified
     double duration = endValue - startValue;
-    if (minDuration != null && duration < minDuration) {
+    if (minDuration != null && duration < minDuration.inMilliseconds) {
       debugPrint("ERROR: Video segment is too short and cannot meet minimum duration.");
       onError("Video segment duration is too short to meet the minimum duration.");
       return;
