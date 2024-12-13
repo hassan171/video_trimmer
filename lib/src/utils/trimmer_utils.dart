@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Formats a [Duration] object to a human-readable string.
@@ -81,14 +82,13 @@ Stream<List<Uint8List?>> generateThumbnail({
   log('Generating thumbnails for video: $videoPath');
   log('Total thumbnails to generate: $numberOfThumbnails');
   log('Quality: $quality% (FFmpeg scale: ${_mapQualityToFFmpegScale(quality)})');
-  log('Generating thumbnails...');
   log('---------------------------------');
 
   try {
     // Get the temporary directory
     final tmpDir = await getTemporaryDirectory();
 
-    // Step 2: Generate thumbnails from the downscaled video
+    // Step 2: Generate thumbnails from the down scaled video
     for (int i = 1; i <= numberOfThumbnails; i++) {
       log('Generating thumbnail $i / $numberOfThumbnails');
 
@@ -99,37 +99,40 @@ Stream<List<Uint8List?>> generateThumbnail({
       final formattedTimestamp = _formatDuration(Duration(milliseconds: timestamp));
       final thumbnailPath = "${tmpDir.path}/thumbnail_$i.jpg";
 
-      // Delete the file if it already exists
+      // Delete any existing file at the path
       if (File(thumbnailPath).existsSync()) {
         await File(thumbnailPath).delete();
       }
 
-      // Create FFmpeg command to extract a resized, lower-quality thumbnail
+      // Construct and execute FFmpeg command
       final command = [
-        '-ss $formattedTimestamp', // Seek to timestamp
-        '-i "$videoPath"', // Input downscaled video
-        '-frames:v 1',
-        '-q:v ${_mapQualityToFFmpegScale(quality)}', // Lower quality
-        '"$thumbnailPath"', // Output file
-      ].join(' ');
+        '-ss',
+        formattedTimestamp,
+        '-i',
+        videoPath,
+        '-frames:v',
+        '1',
+        '-q:v',
+        _mapQualityToFFmpegScale(quality).toString(),
+        thumbnailPath,
+      ];
+      final session = await FFmpegKit.execute(command.join(' '));
+      final returnCode = await session.getReturnCode();
 
-      // Execute the FFmpeg command
-      await FFmpegKit.execute(command);
-
-      // Read the generated thumbnail file
-      if (File(thumbnailPath).existsSync()) {
-        bytes = await File(thumbnailPath).readAsBytes();
-      }
-
-      if (bytes != null) {
-        log('Timestamp: $formattedTimestamp | Size: ${(bytes.length / 1000).toStringAsFixed(2)} kB');
-        log('---------------------------------');
-        lastBytes = bytes; // Cache the last valid thumbnail
+      if (ReturnCode.isSuccess(returnCode)) {
+        // Read generated file and clean up
+        if (File(thumbnailPath).existsSync()) {
+          bytes = await File(thumbnailPath).readAsBytes();
+          await File(thumbnailPath).delete();
+        }
       } else {
-        bytes = lastBytes; // Use the previous thumbnail if current fails
+        log('FFmpeg failed for thumbnail $i with return code: $returnCode');
       }
 
+      // Cache and yield the thumbnail
+      bytes = bytes ?? lastBytes;
       thumbnailBytes.add(bytes);
+      lastBytes = bytes;
 
       if (thumbnailBytes.length == numberOfThumbnails) {
         onThumbnailLoadingComplete();
@@ -140,5 +143,6 @@ Stream<List<Uint8List?>> generateThumbnail({
     log('Thumbnails generated successfully!');
   } catch (e) {
     log('ERROR: Couldn\'t generate thumbnails: $e');
+    yield thumbnailBytes; // Yield partial results on error
   }
 }

@@ -23,8 +23,7 @@ enum TrimmerEvent { initialized }
 class Trimmer {
   // final FlutterFFmpeg _flutterFFmpeg = FFmpegKit();
 
-  final StreamController<TrimmerEvent> _controller =
-      StreamController<TrimmerEvent>.broadcast();
+  final StreamController<TrimmerEvent> _controller = StreamController<TrimmerEvent>.broadcast();
 
   VideoPlayerController? _videoPlayerController;
 
@@ -73,8 +72,7 @@ class Trimmer {
     }
 
     // Directory + folder name
-    final Directory directoryFolder =
-        Directory('${directory!.path}/$folderName/');
+    final Directory directoryFolder = Directory('${directory!.path}/$folderName/');
 
     if (await directoryFolder.exists()) {
       // If folder already exists return path
@@ -83,8 +81,7 @@ class Trimmer {
     } else {
       debugPrint('Creating');
       // If folder does not exists create folder and then return its path
-      final Directory directoryNewFolder =
-          await directoryFolder.create(recursive: true);
+      final Directory directoryNewFolder = await directoryFolder.create(recursive: true);
       return directoryNewFolder.path;
     }
   }
@@ -173,99 +170,65 @@ class Trimmer {
     String? videoFileName,
     StorageDir? storageDir,
   }) async {
+    outputFormat ??= FileFormat.mp4;
+    fpsGIF ??= 10;
+    scaleGIF ??= 480;
+
     final String videoPath = currentVideoFile!.path;
     final String videoName = basename(videoPath).split('.')[0];
-
-    String command;
-
-    // Formatting Date and Time
-    String dateTime = DateFormat.yMMMd()
-        .addPattern('-')
-        .add_Hms()
-        .format(DateTime.now())
-        .toString();
-
-    // String _resultString;
-    String outputPath;
-    String? outputFormatString;
-    String formattedDateTime = dateTime.replaceAll(' ', '');
-
-    debugPrint("DateTime: $dateTime");
-    debugPrint("Formatted: $formattedDateTime");
-
+    final String dateTime = DateFormat.yMMMd().addPattern('-').add_Hms().format(DateTime.now()).toString().replaceAll(' ', '');
     videoFolderName ??= "Trimmer";
+    videoFileName ??= "${videoName}_trimmed:$dateTime".replaceAll(' ', '_');
 
-    videoFileName ??= "${videoName}_trimmed:$formattedDateTime";
-
-    videoFileName = videoFileName.replaceAll(' ', '_');
-
-    String path = await _createFolderInAppDocDir(
-      videoFolderName,
-      storageDir,
-    ).whenComplete(
-      () => debugPrint("Retrieved Trimmer folder"),
-    );
+    String path = await _createFolderInAppDocDir(videoFolderName, storageDir);
+    debugPrint("Trimmer folder path: $path");
 
     Duration startPoint = Duration(milliseconds: startValue.toInt());
     Duration endPoint = Duration(milliseconds: endValue.toInt());
 
-    // Checking the start and end point strings
-    debugPrint("Start: ${startPoint.toString()} & End: ${endPoint.toString()}");
+    String outputPath = '$path$videoFileName${outputFormat.toString()}';
+    debugPrint('Output Path: $outputPath');
 
-    debugPrint(path);
-
-    if (outputFormat == null) {
-      outputFormat = FileFormat.mp4;
-      outputFormatString = outputFormat.toString();
-      debugPrint('OUTPUT: $outputFormatString');
-    } else {
-      outputFormatString = outputFormat.toString();
-    }
-
-    String trimLengthCommand =
-        ' -ss $startPoint -i "$videoPath" -t ${endPoint - startPoint} -avoid_negative_ts make_zero ';
+    final StringBuffer commandBuffer = StringBuffer()
+      ..write('-ss $startPoint ')
+      ..write('-i "$videoPath" ')
+      ..write('-t ${endPoint - startPoint} ')
+      ..write('-avoid_negative_ts make_zero ');
 
     if (ffmpegCommand == null) {
-      command = '$trimLengthCommand -c:a copy ';
-
+      commandBuffer.write('-c:a copy ');
       if (!applyVideoEncoding) {
-        command += '-c:v copy ';
+        commandBuffer.write('-c:v copy ');
       }
 
       if (outputFormat == FileFormat.gif) {
-        fpsGIF ??= 10;
-        scaleGIF ??= 480;
-        command =
-            '$trimLengthCommand -vf "fps=$fpsGIF,scale=$scaleGIF:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 ';
+        commandBuffer.write('-vf "fps=$fpsGIF,scale=$scaleGIF:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 ');
       }
     } else {
-      command = '$trimLengthCommand $ffmpegCommand ';
-      outputFormatString = customVideoFormat;
+      commandBuffer.write('$ffmpegCommand ');
     }
 
-    outputPath = '$path$videoFileName$outputFormatString';
+    commandBuffer.write('"$outputPath"');
+    String command = commandBuffer.toString();
 
-    command += '"$outputPath"';
+    debugPrint('FFmpeg Command: $command');
 
     FFmpegKit.executeAsync(command, (session) async {
-      final state =
-          FFmpegKitConfig.sessionStateToString(await session.getState());
+      final state = await session.getState();
       final returnCode = await session.getReturnCode();
+      final failStackTrace = await session.getFailStackTrace();
 
-      debugPrint("FFmpeg process exited with state $state and rc $returnCode");
+      debugPrint("FFmpeg process exited with state: ${FFmpegKitConfig.sessionStateToString(state)}");
+      debugPrint("Return code: $returnCode");
 
       if (ReturnCode.isSuccess(returnCode)) {
         debugPrint("FFmpeg processing completed successfully.");
-        debugPrint('Video successfully saved');
         onSave(outputPath);
       } else {
-        debugPrint("FFmpeg processing failed.");
-        debugPrint('Couldn\'t save the video');
+        debugPrint("FFmpeg processing failed with error: $failStackTrace");
         onSave(null);
       }
     });
-
-    // return _outputPath;
   }
 
   /// For getting the video controller state, to know whether the
@@ -286,10 +249,8 @@ class Trimmer {
       await videoPlayerController!.pause();
       return false;
     } else {
-      if (videoPlayerController!.value.position.inMilliseconds >=
-          endValue.toInt()) {
-        await videoPlayerController!
-            .seekTo(Duration(milliseconds: startValue.toInt()));
+      if (videoPlayerController!.value.position.inMilliseconds >= endValue.toInt()) {
+        await videoPlayerController!.seekTo(Duration(milliseconds: startValue.toInt()));
         await videoPlayerController!.play();
         return true;
       } else {
