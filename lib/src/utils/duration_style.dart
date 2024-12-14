@@ -6,7 +6,24 @@ enum DurationStyle {
   FORMAT_SS,
   FORMAT_HH_MM_SS_MS,
   FORMAT_MM_SS_MS,
-  FORMAT_SS_MS,
+  FORMAT_SS_MS;
+
+  double charLength() {
+    switch (this) {
+      case FORMAT_HH_MM_SS:
+        return 8;
+      case FORMAT_MM_SS:
+        return 5;
+      case FORMAT_SS:
+        return 2;
+      case FORMAT_HH_MM_SS_MS:
+        return 11;
+      case FORMAT_MM_SS_MS:
+        return 8;
+      case FORMAT_SS_MS:
+        return 5;
+    }
+  }
 }
 
 extension DurationFormatExt on Duration {
@@ -76,12 +93,10 @@ extension DurationFormatExt on Duration {
   }
 
   /// Get Raw Hours.
-  static int _getRawHours(int milliSecond) =>
-      (milliSecond / (3600 * 1000)).floor();
+  static int _getRawHours(int milliSecond) => (milliSecond / (3600 * 1000)).floor();
 
   /// Get Raw Minute. 0 ~ 59. 1 hours = 0.
-  static int _getMinute(int milliSecond) =>
-      (milliSecond / (60 * 1000) % 60).floor();
+  static int _getMinute(int milliSecond) => (milliSecond / (60 * 1000) % 60).floor();
 
   /// Get Raw Minute
   static int _getRawMinute(int milliSecond) => (milliSecond / 60000).floor();

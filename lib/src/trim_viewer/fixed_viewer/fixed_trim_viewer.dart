@@ -26,11 +26,17 @@ class FixedTrimViewer extends StatefulWidget {
   /// For defining the maximum length of the output video.
   final Duration maxVideoLength;
 
+  /// For defining the minimum length of the output video.
+  final Duration minVideoLength;
+
   /// For showing the start and the end point of the
   /// video on top of the trimmer area.
   ///
   /// By default it is set to `true`.
   final bool showDuration;
+
+  /// For showing the trimmer details.
+  final bool showTrimmerDetails;
 
   /// For providing a `TextStyle` to the
   /// duration text.
@@ -119,7 +125,9 @@ class FixedTrimViewer extends StatefulWidget {
     this.viewerWidth = 50.0 * 8,
     this.viewerHeight = 50,
     this.maxVideoLength = const Duration(milliseconds: 0),
+    this.minVideoLength = const Duration(seconds: 1),
     this.showDuration = true,
+    this.showTrimmerDetails = false,
     this.durationTextStyle = const TextStyle(color: Colors.white),
     this.durationStyle = DurationStyle.FORMAT_HH_MM_SS,
     this.onChangeStart,
@@ -133,8 +141,7 @@ class FixedTrimViewer extends StatefulWidget {
   State<FixedTrimViewer> createState() => _FixedTrimViewerState();
 }
 
-class _FixedTrimViewerState extends State<FixedTrimViewer>
-    with TickerProviderStateMixin {
+class _FixedTrimViewerState extends State<FixedTrimViewer> with TickerProviderStateMixin {
   final _trimmerAreaKey = GlobalKey();
   File? get _videoFile => widget.trimmer.currentVideoFile;
 
@@ -161,6 +168,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
 
   double? fraction;
   double? maxLengthPixels;
+  double? minLengthPixels;
 
   FixedThumbnailViewer? thumbnailWidget;
 
@@ -170,8 +178,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
 
   /// Quick access to VideoPlayerController, only not null after [TrimmerEvent.initialized]
   /// has been emitted.
-  VideoPlayerController get videoPlayerController =>
-      widget.trimmer.videoPlayerController!;
+  VideoPlayerController get videoPlayerController => widget.trimmer.videoPlayerController!;
 
   /// Keep track of the drag type, e.g. whether the user drags the left, center or
   /// right part of the frame. Set this in [_onDragStart] when the dragging starts.
@@ -190,8 +197,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     _thumbnailViewerH = widget.viewerHeight;
     log('thumbnailViewerW: $_thumbnailViewerW');
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      final renderBox =
-          _trimmerAreaKey.currentContext?.findRenderObject() as RenderBox?;
+      final renderBox = _trimmerAreaKey.currentContext?.findRenderObject() as RenderBox?;
       final trimmerActualWidth = renderBox?.size.width;
       log('RENDER BOX: $trimmerActualWidth');
       if (trimmerActualWidth == null) return;
@@ -216,11 +222,9 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
         this.thumbnailWidget = thumbnailWidget;
         Duration totalDuration = videoPlayerController.value.duration;
 
-        if (widget.maxVideoLength > const Duration(milliseconds: 0) &&
-            widget.maxVideoLength < totalDuration) {
+        if (widget.maxVideoLength > const Duration(milliseconds: 0) && widget.maxVideoLength < totalDuration) {
           if (widget.maxVideoLength < totalDuration) {
-            fraction = widget.maxVideoLength.inMilliseconds /
-                totalDuration.inMilliseconds;
+            fraction = widget.maxVideoLength.inMilliseconds / totalDuration.inMilliseconds;
 
             maxLengthPixels = _thumbnailViewerW * fraction!;
           }
@@ -228,9 +232,17 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
           maxLengthPixels = _thumbnailViewerW;
         }
 
-        _videoEndPos = fraction != null
-            ? _videoDuration.toDouble() * fraction!
-            : _videoDuration.toDouble();
+        if (widget.minVideoLength > const Duration(milliseconds: 0) && widget.minVideoLength < totalDuration) {
+          if (widget.minVideoLength < totalDuration) {
+            fraction = widget.minVideoLength.inMilliseconds / totalDuration.inMilliseconds;
+
+            minLengthPixels = _thumbnailViewerW * fraction!;
+          }
+        } else {
+          minLengthPixels = 0;
+        }
+
+        _videoEndPos = fraction != null ? _videoDuration.toDouble() * fraction! : _videoDuration.toDouble();
 
         widget.onChangeEnd!(_videoEndPos);
 
@@ -243,8 +255,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
         _linearTween = Tween(begin: _startPos.dx, end: _endPos.dx);
         _animationController = AnimationController(
           vsync: this,
-          duration:
-              Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt()),
+          duration: Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt()),
         );
 
         _scrubberAnimation = _linearTween.animate(_animationController!)
@@ -268,8 +279,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
         if (isPlaying) {
           widget.onChangePlaybackState!(true);
           setState(() {
-            _currentPosition =
-                videoPlayerController.value.position.inMilliseconds;
+            _currentPosition = videoPlayerController.value.position.inMilliseconds;
 
             if (_currentPosition > _videoEndPos.toInt()) {
               videoPlayerController.pause();
@@ -285,8 +295,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
         } else {
           if (videoPlayerController.value.isInitialized) {
             if (_animationController != null) {
-              if ((_scrubberAnimation?.value ?? 0).toInt() ==
-                  (_endPos.dx).toInt()) {
+              if ((_scrubberAnimation?.value ?? 0).toInt() == (_endPos.dx).toInt()) {
                 _animationController!.reset();
               }
               _animationController!.stop();
@@ -304,6 +313,8 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
   /// Called when the user starts dragging the frame, on either side on the whole frame.
   /// Determine which [EditorDragType] is used.
   void _onDragStart(DragStartDetails details) {
+    widget.trimmer.videoPlayerController!.pause();
+
     debugPrint("_onDragStart");
     debugPrint(details.localPosition.toString());
     debugPrint((_startPos.dx - details.localPosition.dx).abs().toString());
@@ -314,8 +325,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
 
     // First we determine whether the dragging motion should be allowed. The allowed
     // zone is widget.sideTapSize (left) + frame (center) + widget.sideTapSize (right)
-    if (startDifference <= widget.editorProperties.sideTapSize &&
-        endDifference >= -widget.editorProperties.sideTapSize) {
+    if (startDifference <= widget.editorProperties.sideTapSize && endDifference >= -widget.editorProperties.sideTapSize) {
       _allowDrag = true;
     } else {
       debugPrint("Dragging is outside of frame, ignoring gesture...");
@@ -324,11 +334,9 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     }
 
     // Now we determine which part is dragged
-    if (details.localPosition.dx <=
-        _startPos.dx + widget.editorProperties.sideTapSize) {
+    if (details.localPosition.dx <= _startPos.dx + widget.editorProperties.sideTapSize) {
       _dragType = EditorDragType.left;
-    } else if (details.localPosition.dx <=
-        _endPos.dx - widget.editorProperties.sideTapSize) {
+    } else if (details.localPosition.dx <= _endPos.dx - widget.editorProperties.sideTapSize) {
       _dragType = EditorDragType.center;
     } else {
       _dragType = EditorDragType.right;
@@ -344,7 +352,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     if (_dragType == EditorDragType.left) {
       _startCircleSize = widget.editorProperties.circleSizeOnDrag;
       if ((_startPos.dx + details.delta.dx >= 0) &&
-          (_startPos.dx + details.delta.dx <= _endPos.dx) &&
+          (_startPos.dx + details.delta.dx <= _endPos.dx - minLengthPixels!) &&
           !(_endPos.dx - _startPos.dx - details.delta.dx > maxLengthPixels!)) {
         _startPos += details.delta;
         _onStartDragged();
@@ -352,8 +360,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     } else if (_dragType == EditorDragType.center) {
       _startCircleSize = widget.editorProperties.circleSizeOnDrag;
       _endCircleSize = widget.editorProperties.circleSizeOnDrag;
-      if ((_startPos.dx + details.delta.dx >= 0) &&
-          (_endPos.dx + details.delta.dx <= _thumbnailViewerW)) {
+      if ((_startPos.dx + details.delta.dx >= 0) && (_endPos.dx + details.delta.dx <= _thumbnailViewerW)) {
         _startPos += details.delta;
         _endPos += details.delta;
         _onStartDragged();
@@ -362,7 +369,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     } else {
       _endCircleSize = widget.editorProperties.circleSizeOnDrag;
       if ((_endPos.dx + details.delta.dx <= _thumbnailViewerW) &&
-          (_endPos.dx + details.delta.dx >= _startPos.dx) &&
+          (_endPos.dx + details.delta.dx >= _startPos.dx + minLengthPixels!) &&
           !(_endPos.dx - _startPos.dx + details.delta.dx > maxLengthPixels!)) {
         _endPos += details.delta;
         _onEndDragged();
@@ -376,8 +383,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     _videoStartPos = _videoDuration * _startFraction;
     widget.onChangeStart!(_videoStartPos);
     _linearTween.begin = _startPos.dx;
-    _animationController!.duration =
-        Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
+    _animationController!.duration = Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
     _animationController!.reset();
   }
 
@@ -386,8 +392,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     _videoEndPos = _videoDuration * _endFraction;
     widget.onChangeEnd!(_videoEndPos);
     _linearTween.end = _endPos.dx;
-    _animationController!.duration =
-        Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
+    _animationController!.duration = Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
     _animationController!.reset();
   }
 
@@ -397,11 +402,9 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
       _startCircleSize = widget.editorProperties.circleSize;
       _endCircleSize = widget.editorProperties.circleSize;
       if (_dragType == EditorDragType.right) {
-        videoPlayerController
-            .seekTo(Duration(milliseconds: _videoEndPos.toInt()));
+        videoPlayerController.seekTo(Duration(milliseconds: _videoEndPos.toInt()));
       } else {
-        videoPlayerController
-            .seekTo(Duration(milliseconds: _videoStartPos.toInt()));
+        videoPlayerController.seekTo(Duration(milliseconds: _videoStartPos.toInt()));
       }
     });
   }
@@ -437,20 +440,15 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
                       mainAxisSize: MainAxisSize.max,
                       children: <Widget>[
                         Text(
-                          Duration(milliseconds: _videoStartPos.toInt())
-                              .format(widget.durationStyle),
+                          Duration(milliseconds: _videoStartPos.toInt()).format(widget.durationStyle),
                           style: widget.durationTextStyle,
                         ),
-                        videoPlayerController.value.isPlaying
-                            ? Text(
-                                Duration(milliseconds: _currentPosition.toInt())
-                                    .format(widget.durationStyle),
-                                style: widget.durationTextStyle,
-                              )
-                            : Container(),
                         Text(
-                          Duration(milliseconds: _videoEndPos.toInt())
-                              .format(widget.durationStyle),
+                          videoPlayerController.value.isPlaying ? Duration(milliseconds: _currentPosition.toInt()).format(widget.durationStyle) : '',
+                          style: widget.durationTextStyle,
+                        ),
+                        Text(
+                          Duration(milliseconds: _videoEndPos.toInt()).format(widget.durationStyle),
                           style: widget.durationTextStyle,
                         ),
                       ],
@@ -462,6 +460,10 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
             foregroundPainter: TrimEditorPainter(
               startPos: _startPos,
               endPos: _endPos,
+              videoStartPos: _videoStartPos,
+              videoEndPos: _videoEndPos,
+              showTrimmerDetails: widget.showTrimmerDetails,
+              durationStyle: DurationStyle.FORMAT_MM_SS_MS,
               scrubberAnimationDx: _scrubberAnimation?.value ?? 0,
               startCircleSize: _startCircleSize,
               endCircleSize: _endCircleSize,
@@ -473,15 +475,12 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
               scrubberPaintColor: widget.editorProperties.scrubberPaintColor,
             ),
             child: ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(widget.areaProperties.borderRadius),
+              borderRadius: BorderRadius.circular(widget.areaProperties.borderRadius),
               child: Container(
                 key: _trimmerAreaKey,
                 color: Colors.grey[900],
                 height: _thumbnailViewerH,
-                width: _thumbnailViewerW == 0.0
-                    ? widget.viewerWidth
-                    : _thumbnailViewerW,
+                width: _thumbnailViewerW == 0.0 ? widget.viewerWidth : _thumbnailViewerW,
                 child: thumbnailWidget ?? Container(),
               ),
             ),

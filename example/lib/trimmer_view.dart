@@ -97,7 +97,11 @@ class _TrimmerViewState extends State<TrimmerView> {
                       viewerHeight: 50.0,
                       viewerWidth: MediaQuery.of(context).size.width,
                       durationStyle: DurationStyle.FORMAT_MM_SS,
-                      maxVideoLength: const Duration(seconds: 10),
+                      showDuration: false,
+                      showTrimmerDetails: false,
+                      maxVideoLength: const Duration(hours: 10),
+                      minVideoLength: const Duration(seconds: 5),
+                      type: ViewerType.fixed,
                       editorProperties: TrimEditorProperties(
                         borderPaintColor: Colors.yellow,
                         borderWidth: 4,
@@ -105,7 +109,7 @@ class _TrimmerViewState extends State<TrimmerView> {
                         circlePaintColor: Colors.yellow.shade800,
                       ),
                       areaProperties: TrimAreaProperties.edgeBlur(
-                        thumbnailQuality: 10,
+                        thumbnailQuality: 100,
                       ),
                       onChangeStart: (value) => _startValue = value,
                       onChangeEnd: (value) => _endValue = value,

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_trimmer/video_trimmer.dart';
 
-import 'fixed_viewer/fixed_trim_viewer.dart';
-import 'scrollable_viewer/scrollable_trim_viewer.dart';
-
 enum ViewerType {
   /// Automatically decide whether to use the
   /// fixed length or scrollable editor.
@@ -42,11 +39,18 @@ class TrimViewer extends StatefulWidget {
   /// specifying this property is mandatory.
   final Duration maxVideoLength;
 
+  /// For defining the minimum length of the output video.
+  /// By default it is set to `Duration(seconds: 1)`.
+  final Duration minVideoLength;
+
   /// For showing the start and the end point of the
   /// video on top of the trimmer area.
   ///
   /// By default it is set to `true`.
   final bool showDuration;
+
+  /// For showing the trimmer details.
+  final bool showTrimmerDetails;
 
   /// For providing a `TextStyle` to the
   /// duration text.
@@ -171,10 +175,12 @@ class TrimViewer extends StatefulWidget {
     Key? key,
     required this.trimmer,
     this.maxVideoLength = const Duration(milliseconds: 0),
+    this.minVideoLength = const Duration(seconds: 1),
     this.type = ViewerType.auto,
     this.viewerWidth = 50 * 8,
     this.viewerHeight = 50,
     this.showDuration = true,
+    this.showTrimmerDetails = false,
     this.durationTextStyle = const TextStyle(color: Colors.white),
     this.durationStyle = DurationStyle.FORMAT_HH_MM_SS,
     this.onChangeStart,
@@ -198,17 +204,12 @@ class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
     super.initState();
     widget.trimmer.eventStream.listen((event) {
       if (event == TrimmerEvent.initialized) {
-        final totalDuration =
-            widget.trimmer.videoPlayerController!.value.duration;
+        final totalDuration = widget.trimmer.videoPlayerController!.value.duration;
         final maxVideoLength = widget.maxVideoLength;
         final paddingFraction = widget.paddingFraction;
-        final trimAreaDuration = Duration(
-            milliseconds: (maxVideoLength.inMilliseconds +
-                ((paddingFraction * maxVideoLength.inMilliseconds) * 2)
-                    .toInt()));
+        final trimAreaDuration = Duration(milliseconds: (maxVideoLength.inMilliseconds + ((paddingFraction * maxVideoLength.inMilliseconds) * 2).toInt()));
 
-        final shouldScroll = trimAreaDuration <= totalDuration &&
-            maxVideoLength.compareTo(const Duration(milliseconds: 0)) != 0;
+        final shouldScroll = trimAreaDuration <= totalDuration && maxVideoLength.compareTo(const Duration(milliseconds: 0)) != 0;
         if (widget.type == ViewerType.scrollable && !shouldScroll) {
           throw 'Total video duration is less than maxVideoLength + padding. '
               'Can\'t use `ScrollableTrimViewer`. Change the type to `ViewerType.auto`.';
@@ -244,9 +245,11 @@ class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
     final fixedTrimViewer = FixedTrimViewer(
       trimmer: widget.trimmer,
       maxVideoLength: widget.maxVideoLength,
+      minVideoLength: widget.minVideoLength,
       viewerWidth: widget.viewerWidth,
       viewerHeight: widget.viewerHeight,
       showDuration: widget.showDuration,
+      showTrimmerDetails: widget.showTrimmerDetails,
       durationTextStyle: widget.durationTextStyle,
       durationStyle: widget.durationStyle,
       onChangeStart: widget.onChangeStart,
