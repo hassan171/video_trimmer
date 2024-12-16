@@ -280,10 +280,10 @@ class _FixedTrimViewerState extends State<FixedTrimViewer> with TickerProviderSt
   setStartAndEndVideoPos(double start, double end) {
     _videoStartPos = start;
     _videoEndPos = end;
-    _startPos = Offset(start / _videoDuration * _thumbnailViewerW, _thumbnailViewerH);
-    _endPos = Offset(end / _videoDuration * _thumbnailViewerW, _thumbnailViewerH);
-    _startFraction = start / _videoDuration;
-    _endFraction = end / _videoDuration;
+    _startPos = Offset(start / _videoDuration * _thumbnailViewerW, _startPos.dy);
+    _endPos = Offset(end / _videoDuration * _thumbnailViewerW, _endPos.dy);
+    _startFraction = _startPos.dx / _videoDuration;
+    _endFraction = _endPos.dx / _videoDuration;
     _linearTween.begin = _startPos.dx;
     _linearTween.end = _endPos.dx;
     _animationController!.duration = Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
