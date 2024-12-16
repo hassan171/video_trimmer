@@ -269,6 +269,20 @@ class _FixedTrimViewerState extends State<FixedTrimViewer> with TickerProviderSt
           });
       });
     });
+
+    widget.trimmer.startEndValue.listen((event) {
+      setStartAndEndVideoPos(event.$1, event.$2);
+    });
+  }
+
+  setStartAndEndVideoPos(double start, double end) {
+    _videoStartPos = start;
+    _videoEndPos = end;
+    _startPos = Offset(_videoStartPos / _videoDuration * _thumbnailViewerW, _thumbnailViewerH);
+    _endPos = Offset(_videoEndPos / _videoDuration * _thumbnailViewerW, _thumbnailViewerH);
+    _onStartDragged();
+    _onEndDragged();
+    setState(() {});
   }
 
   Future<void> _initializeVideoController() async {

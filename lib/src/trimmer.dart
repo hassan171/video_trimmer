@@ -34,6 +34,10 @@ class Trimmer {
   /// Listen to this stream to catch the events
   Stream<TrimmerEvent> get eventStream => _controller.stream;
 
+  final StreamController<(double, double)> _startEndValue = StreamController<(double, double)>.broadcast();
+
+  Stream<(double, double)> get startEndValue => _startEndValue.stream;
+
   /// Loads a video using the path provided.
   ///
   /// Returns the loaded video file.
@@ -304,5 +308,11 @@ class Trimmer {
   /// Clean up
   void dispose() {
     _controller.close();
+    _startEndValue.close();
+  }
+
+  //set start and end value
+  void setStartEndValue(double start, double end) {
+    _startEndValue.add((start, end));
   }
 }
