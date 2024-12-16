@@ -529,11 +529,11 @@ class _ScrollableTrimViewerState extends State<ScrollableTrimViewer> with Ticker
     _scrollStartTimer?.cancel();
     _scrollingTimer?.cancel();
     widget.onChangePlaybackState!(false);
-    if (_videoFile != null) {
-      videoPlayerController.setVolume(0.0);
-      videoPlayerController.dispose();
-      widget.onChangePlaybackState!(false);
-    }
+    // if (_videoFile != null) {
+    //   videoPlayerController.setVolume(0.0);
+    //   videoPlayerController.dispose();
+    //   widget.onChangePlaybackState!(false);
+    // }
     super.dispose();
   }
 

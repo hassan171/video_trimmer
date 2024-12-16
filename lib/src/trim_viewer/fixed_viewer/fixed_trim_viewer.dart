@@ -413,11 +413,11 @@ class _FixedTrimViewerState extends State<FixedTrimViewer> with TickerProviderSt
   void dispose() {
     videoPlayerController.pause();
     widget.onChangePlaybackState!(false);
-    if (_videoFile != null) {
-      videoPlayerController.setVolume(0.0);
-      videoPlayerController.dispose();
-      widget.onChangePlaybackState!(false);
-    }
+    // if (_videoFile != null) {
+    //   videoPlayerController.setVolume(0.0);
+    //   videoPlayerController.dispose();
+    //   widget.onChangePlaybackState!(false);
+    // }
     super.dispose();
   }
 
